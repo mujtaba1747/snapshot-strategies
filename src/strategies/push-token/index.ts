@@ -1,31 +1,10 @@
 import { formatUnits } from '@ethersproject/units';
 import { multicall } from '../../utils';
 
-export const author = 'Arr00';
+export const author = 'mujtaba1747';
 export const version = '0.1.0';
 
 const abi = [
-  {
-    constant: true,
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'account',
-        type: 'address'
-      }
-    ],
-    name: 'getCurrentVotes',
-    outputs: [
-      {
-        internalType: 'uint96',
-        name: '',
-        type: 'uint96'
-      }
-    ],
-    stateMutability: 'view',
-    type: 'function'
-  },
-
   {
     inputs: [
       {
@@ -43,9 +22,9 @@ const abi = [
     name : "balanceOf",
     outputs: [
       {
-         "internalType":"uint256",
-         "name":"",
-         "type":"uint256"
+         internalType:"uint256",
+         name:"",
+         type:"uint256"
       }
     ],
 
@@ -54,51 +33,51 @@ const abi = [
   },
   
   {
-    "inputs": [
+    inputs: [
       {
-        "internalType": "uint256",
-        "name": "amountIn",
-        "type": "uint256"
+        internalType: "uint256",
+        name: "amountIn",
+        type: "uint256"
       },
       {
-        "internalType": "address[]",
-        "name": "path",
-        "type": "address[]"
+        internalType: "address[]",
+        name: "path",
+        type: "address[]"
       }
     ],
-    "name": "getAmountsOut",
-    "outputs": [
+    name: "getAmountsOut",
+    outputs: [
       {
-        "internalType": "uint256[]",
-        "name": "amounts",
-        "type": "uint256[]"
+        internalType: "uint256[]",
+        name: "amounts",
+        type: "uint256[]"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
+    stateMutability: "view",
+    type: "function"
   },
 
 ];
 
 const wethABI = [
   {
-    "constant": true,
-    "inputs": [
+    constant: true,
+    inputs: [
       {
-        "name": "",
-        "type": "address"
+        name: "",
+        type: "address"
       }
     ],
-    "name": "balanceOf",
-    "outputs": [
+    name: "balanceOf",
+    outputs: [
       {
-        "name": "",
-        "type": "uint256"
+        name: "",
+        type: "uint256"
       }
     ],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
+    payable: false,
+    stateMutability: "view",
+    type: "function"
   },
 ];
 
@@ -125,14 +104,31 @@ const epnsTokenABI = [
   },
 
   {
-    "inputs": [
+    inputs: [
       {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
+        internalType: "address",
+        name: "account",
+        type: "address"
       }
     ],
-    "name": "balanceOf",
+    name: "balanceOf",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256"
+      }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+];
+
+const epnsLpABI = [
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "totalSupply",
     "outputs": [
       {
         "internalType": "uint256",
@@ -140,11 +136,11 @@ const epnsTokenABI = [
         "type": "uint256"
       }
     ],
+    "payable": false,
     "stateMutability": "view",
     "type": "function"
-  },
+  }
 ];
-// beautify this and try removing quotes from strings
 
 export async function strategy(
   space,
@@ -178,7 +174,7 @@ export async function strategy(
   );
 
   const responseDelegatedVotes = responseEPNSToken.slice(1);
-  const pushAmountReserve = responseEPNSToken.slice(0, 1);
+  const pushAmountReserve = responseEPNSToken.slice(0, 1)[0][0];
   
 
   const responseStaked =  await multicall(
@@ -203,21 +199,9 @@ export async function strategy(
   );
   
   const responseStakedPUSH = responseStaked.slice(0, addresses.length);
-  const responseStakedLP = responseStaked.slice(addresses.length)
+  const responseStakedLP = responseStaked.slice(addresses.length);
 
-  console.log("Staked $PUSH score:\n", responseStakedPUSH.map((value, i) => [
-    addresses[i],
-    parseFloat(formatUnits(value.toString(), options.decimals))
-  ]));
-
-  console.log("Staked LP-PUSH score:\n",
-    responseStakedLP.map((value, i) => [
-      addresses[i],
-      parseFloat(formatUnits(value.toString(), options.decimals))
-    ]
-  ));
-
-  const responseWETHReserve = await multicall (
+  const responseWETH = await multicall (
     network,
     provider,
     wethABI,
@@ -230,8 +214,6 @@ export async function strategy(
     ],
     {blockTag}
   );
-
-  console.log("wethresp", responseWETHReserve[0][0]);
 
   const responseLPConversion = await multicall(
     network,
@@ -257,10 +239,37 @@ export async function strategy(
   const pushPrice = responseLPConversion[0]["amounts"][2].toNumber() / 1000000;
   const wethPrice  = responseLPConversion[1]["amounts"][1].toNumber() / 1000000;
 
-  console.log("PUSH Price in USDT:\n", pushPrice);
-  console.log("WETH Price in USDT\n", wethPrice);
+  const responseEPNSLPToken = await multicall(
+    network,
+    provider,
+    epnsLpABI,
+    [
+      [
+        options.epnsLPTokenAddr,
+        'totalSupply',
+        []
+      ]
+    ],
+    {blockTag}
+  )
+  const uniLpTotalSupply = responseEPNSLPToken[0][0];
+  console.log("uniTotalSupply", typeof uniLpTotalSupply);
+  console.log("PUSH Price in USDT: ", pushPrice);
+  console.log("WETH Price in USDT: ", wethPrice);
+  console.log("wethresp", responseWETH[0][0]);
+  console.log("push reserve", pushAmountReserve)
 
-  // const pushPrice = responseUniswap[0]
+  console.log("Staked $PUSH score:\n", responseStakedPUSH.map((value, i) => [
+    addresses[i],
+    parseFloat(formatUnits(value.toString(), options.decimals))
+  ]));
+
+  console.log("Staked LP-PUSH score:\n",
+    responseStakedLP.map((value, i) => [
+      addresses[i],
+      parseFloat(formatUnits(value.toString(), options.decimals))
+    ]
+  ));
 
   return Object.fromEntries(
     responseDelegatedVotes.map((value, i) => [
