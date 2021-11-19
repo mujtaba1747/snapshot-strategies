@@ -174,9 +174,8 @@ export async function strategy(
   );
 
   const responseDelegatedVotes = responseEPNSToken.slice(1);
-  const pushAmountReserve = responseEPNSToken.slice(0, 1)[0][0];
+  const pushAmountReserve = parseFloat(responseEPNSToken.slice(0, 1)[0][0].toString()) / 1e18;
   
-
   const responseStaked =  await multicall(
     network,
     provider,
@@ -215,6 +214,8 @@ export async function strategy(
     {blockTag}
   );
 
+  const wethAmountReserve = parseFloat(responseWETH[0][0].toString()) / 1e18;
+
   const responseLPConversion = await multicall(
     network,
     provider,
@@ -236,8 +237,9 @@ export async function strategy(
   );
 
   // console.log("uniswap:\n",responseUniswap.map(a => Object.fromEntries(a)));
-  const pushPrice = responseLPConversion[0]["amounts"][2].toNumber() / 1000000;
-  const wethPrice  = responseLPConversion[1]["amounts"][1].toNumber() / 1000000;
+
+  const pushPrice = parseFloat(responseLPConversion[0]["amounts"][2].toString()) / 1e6;
+  const wethPrice = parseFloat(responseLPConversion[1]["amounts"][1].toString()) / 1e6;
 
   const responseEPNSLPToken = await multicall(
     network,
@@ -252,33 +254,44 @@ export async function strategy(
     ],
     {blockTag}
   )
-  const uniLpTotalSupply = responseEPNSLPToken[0][0];
-  console.log("uniTotalSupply", typeof uniLpTotalSupply);
+  const uniLpTotalSupply = parseFloat(responseEPNSLPToken[0][0].toString()) / 1e18;
+  console.log("uniTotalSupply", uniLpTotalSupply);
   console.log("PUSH Price in USDT: ", pushPrice);
   console.log("WETH Price in USDT: ", wethPrice);
   console.log("wethresp", responseWETH[0][0]);
+  console.log("weth reserve", wethAmountReserve);
   console.log("push reserve", pushAmountReserve)
 
   console.log("Staked $PUSH score:\n", responseStakedPUSH.map((value, i) => [
     addresses[i],
-    parseFloat(formatUnits(value.toString(), options.decimals))
+    parseFloat(formatUnits(value.toString()))
   ]));
 
   console.log("Staked LP-PUSH score:\n",
     responseStakedLP.map((value, i) => [
       addresses[i],
-      parseFloat(formatUnits(value.toString(), options.decimals))
+      parseFloat(formatUnits(value.toString()))
     ]
   ));
+
+  const uniLpPrice = ((pushAmountReserve * pushPrice) + (wethAmountReserve + wethPrice)) / uniLpTotalSupply;
+  console.log("UNI-LP Price: ", uniLpPrice);
+
+  const lpToPushRatio = uniLpPrice / pushPrice;
+
+  // console.log("delegated", responseDelegatedVotes.map((value) => [value.toString()]));
 
   return Object.fromEntries(
     responseDelegatedVotes.map((value, i) => [
       addresses[i],
-      parseFloat(formatUnits(value.toString(), options.decimals))
+      parseFloat(formatUnits(value.toString(), options.decimals)) + 
+      parseFloat(formatUnits(responseStakedPUSH[i].toString(), options.decimals)) + 
+      parseFloat(formatUnits(responseStakedLP[i].toString(), options.decimals)) * lpToPushRatio
     ])
   );
 }
 /*
+      Formula for LP to PUSH conversion from Frontend
 
       const pushPriceAmounts = await this.state.uniswapV2Router02.getAmountsOut(ONE_PUSH.toString(), [addresses.epnsToken, addresses.WETHAddress, addresses.USDTAddress]);
       const pushPrice = pushPriceAmounts[pushPriceAmounts.length -1].toNumber()/1000000;
